@@ -1,0 +1,10 @@
+## Interface: 90002
+## Title: Tournament Synced Timers
+## Notes: Can be useful for organizing M+ community tournaments, raid races etc.
+## Author: Heroicsolo
+## Version: 1.0.0
+
+## X-License: MIT/X
+
+embeds.xml
+main.lua
