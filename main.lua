@@ -290,12 +290,16 @@ function PrintCountdown()
 			SendChatMessage(countdownValue, string.upper("raid"))
 		elseif IsInGroup() then
 			SendChatMessage(countdownValue, string.upper("party"))
+		else
+			Print(countdownValue)
 		end
 	elseif countdownValue == 0 then
 		if IsInRaid() then
 			SendChatMessage("START", string.upper("raid"))
 		elseif IsInGroup() then
 			SendChatMessage("START", string.upper("party"))
+		else
+			Print(countdownValue)
 		end
 	end
 	
@@ -339,6 +343,7 @@ function StartGame()
 	for i=1,#captains do
 		SendAddonEvent(captains[i], "start")
 	end
+	BeginCountdown()
 end
 
 function ResetTeamsList()
