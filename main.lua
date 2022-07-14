@@ -1,5 +1,6 @@
 local addonName, ns = ...
 
+local MAX_TEAMS_COUNT = 8
 local captains = {}
 local countdownValue = 10
 local teamMembersCount = 1
@@ -8,6 +9,10 @@ local spectator = nil
 local countdownTimer = nil
 local AceTimer = LibStub("AceTimer-3.0")
 local captainsList = {}
+local completedTeams = {}
+local startedTeams = {}
+local winner = nil
+local gameStarted = false
 local teamsReadiness = {}
 local panel = nil
 local addonPrefix = "tst123"
@@ -22,6 +27,7 @@ f:RegisterEvent("READY_CHECK_FINISHED")
 f:RegisterEvent("READY_CHECK_CONFIRM")
 f:RegisterEvent("CHAT_MSG_WHISPER")
 f:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+f:RegisterEvent("CHALLENGE_MODE_START")
 
 local function myChatFilter(self, event, msg, author, ...)
   if msg:find(addonPrefix) then
@@ -103,6 +109,8 @@ local function timeFormatMS(timeAmount)
 end
 
 local function OpenPanel()
+	if spectator ~= nil then return end
+
 	if not panel then
         panel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
         panel:SetBackdrop(style.popup.backdrop)
@@ -163,7 +171,7 @@ local function OpenPanel()
 		captainsListTitle:SetText("Captains list:")
 		panel.titlestring = titlestring
 		
-		for i=1,8 do
+		for i=1,MAX_TEAMS_COUNT do
 			local captainEl = panel:CreateFontString(nil, "ARTWORK", "ChatFontNormal")
 			captainEl:SetTextColor(unpack(style.popup.title.color))
 			captainEl:SetFont(style.popup.message.font, style.popup.message.size)
@@ -175,6 +183,8 @@ local function OpenPanel()
 			captainEl:SetText("")
 			captainsList[#captainsList + 1] = captainEl
 			teamsReadiness[#teamsReadiness + 1] = false
+			completedTeams[#completedTeams + 1] = false
+			startedTeams[#startedTeams + 1] = false
 		end
 	end
 	
@@ -191,10 +201,22 @@ end
 function SetCaptainLabels()
 	for i=1,#captainsList do
 		if i <= #captains then
-			if teamsReadiness[i] == true then
-				captainsList[i]:SetText(captains[i].."\124cff00FF00 READY\124r")
+			if gameStarted == false then
+				if teamsReadiness[i] == true then
+					captainsList[i]:SetText(captains[i].."\124cff00FF00 READY\124r")
+				else
+					captainsList[i]:SetText(captains[i].."\124cffFF0000 NOT READY\124r")
+				end
 			else
-				captainsList[i]:SetText(captains[i].."\124cffFF0000 NOT READY\124r")
+				if winner == captains[i] then
+					captainsList[i]:SetText(captains[i].."\124cff00FF00 WINNER\124r")
+				elseif completedTeams[i] == false and startedTeams[i] == true then
+					captainsList[i]:SetText(captains[i].."\124cffFFFF00 RUNNING...\124r")
+				elseif completedTeams[i] == true and startedTeams[i] == true then
+					captainsList[i]:SetText(captains[i].."\124cff00FF00 FINISHED\124r")
+				else
+					captainsList[i]:SetText(captains[i].."\124cffFF0000 PREPARING...\124r")
+				end
 			end
 		end
 	end
@@ -213,7 +235,12 @@ function f:CHALLENGE_MODE_COMPLETED()
 	local mapID, level, time, onTime, keystoneUpgradeLevels = C_ChallengeMode.GetCompletionInfo()
 	local name, _, timeLimit = C_ChallengeMode.GetMapUIInfo(mapID)
 	SendAddonEvent(spectator, "We've completed "..name.."+"..level.." in "..timeFormatMS(time))
+	SendAddonEvent(spectator, "complete")
 	spectator = nil
+end
+
+function f:CHALLENGE_MODE_START(mapID)
+	SendAddonEvent(spectator, "key_activated")
 end
 
 function f:CHAT_MSG_ADDON(prefix, msg, channel, sender)
@@ -229,8 +256,25 @@ function f:CHAT_MSG_ADDON(prefix, msg, channel, sender)
 			DoDBMPull()
 		elseif msg == "ready" then
 			Print(sender.."'s team READY!")
+			local idx = indexOf(captains, sender)
+			teamsReadiness[idx] = true
+			RefreshCaptainsListLabel()
 		elseif msg == "notready" then
 			Print(sender.."'s team NOT ready!")
+			local idx = indexOf(captains, sender)
+			teamsReadiness[idx] = false
+			RefreshCaptainsListLabel()
+		elseif msg == "complete" then
+			if winner == nil then
+				winner = sender
+			end
+			local idx = indexOf(captains, sender)
+			completedTeams[idx] = true
+			RefreshCaptainsListLabel()
+		elseif msg == "key_activated" then
+			local idx = indexOf(captains, sender)
+			startedTeams[idx] = true
+			RefreshCaptainsListLabel()
 		end
 	end
 end
@@ -254,6 +298,17 @@ function f:CHAT_MSG_WHISPER(_, msg, user)
 		Print(user.."'s team NOT ready!")
 		local idx = indexOf(captains, user)
 		teamsReadiness[idx] = false
+		RefreshCaptainsListLabel()
+	elseif msg == "complete" then
+		if winner == nil then
+			winner = user
+		end
+		local idx = indexOf(captains, user)
+		completedTeams[idx] = true
+		RefreshCaptainsListLabel()
+	elseif msg == "key_activated" then
+		local idx = indexOf(captains, user)
+		startedTeams[idx] = true
 		RefreshCaptainsListLabel()
 	elseif msg == "tst123" then
 		RegisterCaptain(user, true)
@@ -305,6 +360,8 @@ function PrintCountdown()
 	
 	if countdownValue == 0 then
 		AceTimer:CancelTimer(countdownTimer)
+		gameStarted = true
+		RefreshCaptainsListLabel()
 	end
 end
 
@@ -336,11 +393,13 @@ end
 
 function StartGame()
     Print("Starting game...")
+	winner = nil
 	if #captains == 0 then
 		DoDBMPull()
 		return
 	end
 	for i=1,#captains do
+		startedTeams[i] = false
 		SendAddonEvent(captains[i], "start")
 	end
 	BeginCountdown()
@@ -348,6 +407,9 @@ end
 
 function ResetTeamsList()
 	captains = {}
+	startedTeams = {}
+	teamsReadiness = {}
+	winner = nil
 	Print("Teams list has been cleared")
 	RefreshCaptainsListLabel()
 end
@@ -381,9 +443,17 @@ function RegisterCaptain(captainUnit, forced)
 		end
 		return
 	end
+	
+	if #captains >= MAX_TEAMS_COUNT - 1 then
+		Print("Tournament table is full!")
+		SendChatMessage("TST: Tournament table is full!", "WHISPER", nil, captainName)
+		return
+	end
 
 	if not has_value(captains, captainName) then
 		captains[#captains + 1] = captainName
+		teamsReadiness[#captains + 1] = false
+		startedTeams[#captains + 1] = false
 		Print("Registered captain: "..captainName)
 		RefreshCaptainsListLabel()
 		SendChatMessage("TST: Your party has been registered!", "WHISPER", nil, captainName)
