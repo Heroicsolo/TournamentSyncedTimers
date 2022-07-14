@@ -343,18 +343,22 @@ function PrintCountdown()
 	if countdownValue > 0 then
 		if IsInRaid() then
 			SendChatMessage(countdownValue, string.upper("raid"))
+			SendChatMessage(countdownValue, string.upper("say"))
 		elseif IsInGroup() then
 			SendChatMessage(countdownValue, string.upper("party"))
+			SendChatMessage(countdownValue, string.upper("say"))
 		else
 			Print(countdownValue)
 		end
 	elseif countdownValue == 0 then
 		if IsInRaid() then
 			SendChatMessage("START", string.upper("raid"))
+			SendChatMessage("START", string.upper("say"))
 		elseif IsInGroup() then
 			SendChatMessage("START", string.upper("party"))
+			SendChatMessage("START", string.upper("say"))
 		else
-			Print(countdownValue)
+			Print("START")
 		end
 	end
 	
