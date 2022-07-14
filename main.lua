@@ -192,9 +192,9 @@ function SetCaptainLabels()
 	for i=1,#captainsList do
 		if i <= #captains then
 			if teamsReadiness[i] == true then
-				captainsList[i]:SetText(captains[i].."\124cff00FF00READY\124r")
+				captainsList[i]:SetText(captains[i].."\124cff00FF00 READY\124r")
 			else
-				captainsList[i]:SetText(captains[i].."\124cffFF0000NOT READY\124r")
+				captainsList[i]:SetText(captains[i].."\124cffFF0000 NOT READY\124r")
 			end
 		end
 	end
