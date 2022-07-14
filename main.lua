@@ -17,10 +17,13 @@ local teamsReadiness = {}
 local panel = nil
 local addonPrefix = "tst123"
 local defaultfont = [[Fonts\FRIZQT__.TTF]]
+local TST = LibStub("AceAddon-3.0"):NewAddon("TST", "AceTimer-3.0")
 local f = CreateFrame("Frame")
+
 f:SetScript("OnEvent", function(self, event, ...)
 	return self[event] and self[event](self, event, ...)
 end)
+
 f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("CHAT_MSG_ADDON")
 f:RegisterEvent("READY_CHECK_FINISHED")
@@ -252,7 +255,7 @@ function f:CHAT_MSG_ADDON(prefix, msg, channel, sender)
 			teamMembersCount = GetNumGroupMembers()
 		elseif msg == "start" then
 			spectator = sender
-			BeginCountdown()
+			TST:BeginCountdown()
 			DoDBMPull()
 		elseif msg == "ready" then
 			Print(sender.."'s team READY!")
@@ -282,7 +285,7 @@ end
 function f:CHAT_MSG_WHISPER(_, msg, user)
 	if msg == "tst123 start" then
 		spectator = user
-		BeginCountdown()
+		TST:BeginCountdown()
 		DoDBMPull()
 	elseif msg == "tst123 rc" then
 		spectator = user
@@ -331,39 +334,49 @@ function f:READY_CHECK_CONFIRM(unit,response,isTest)
 	end
 end
 
-function BeginCountdown()
+function TST:BeginCountdown()
 	countdownValue = 11
-	PrintCountdown()
-	countdownTimer = AceTimer:ScheduleRepeatingTimer("PrintCountdown", 1)
+	self:PrintCountdown()
+	countdownTimer = self:ScheduleRepeatingTimer("PrintCountdown", 1)
 end
 
-function PrintCountdown()
+function TST:PrintCountdown()
 	countdownValue = countdownValue - 1
+	
+	local inInstance, instanceType = IsInInstance()
 	
 	if countdownValue > 0 then
 		if IsInRaid() then
 			SendChatMessage(countdownValue, string.upper("raid"))
-			SendChatMessage(countdownValue, string.upper("say"))
+			if inInstance then
+				SendChatMessage(countdownValue, string.upper("say"))
+			end
 		elseif IsInGroup() then
 			SendChatMessage(countdownValue, string.upper("party"))
-			SendChatMessage(countdownValue, string.upper("say"))
+			if inInstance then
+				SendChatMessage(countdownValue, string.upper("say"))
+			end
 		else
 			Print(countdownValue)
 		end
 	elseif countdownValue == 0 then
 		if IsInRaid() then
 			SendChatMessage("START", string.upper("raid"))
-			SendChatMessage("START", string.upper("say"))
+			if inInstance then
+				SendChatMessage("START", string.upper("say"))
+			end
 		elseif IsInGroup() then
 			SendChatMessage("START", string.upper("party"))
-			SendChatMessage("START", string.upper("say"))
+			if inInstance then
+				SendChatMessage("START", string.upper("say"))
+			end
 		else
 			Print("START")
 		end
 	end
 	
 	if countdownValue == 0 then
-		AceTimer:CancelTimer(countdownTimer)
+		self:CancelTimer(countdownTimer)
 		gameStarted = true
 		RefreshCaptainsListLabel()
 	end
@@ -398,15 +411,12 @@ end
 function StartGame()
     Print("Starting game...")
 	winner = nil
-	if #captains == 0 then
-		DoDBMPull()
-		return
-	end
+	TST:BeginCountdown()
+	DoDBMPull()
 	for i=1,#captains do
 		startedTeams[i] = false
 		SendAddonEvent(captains[i], "start")
 	end
-	BeginCountdown()
 end
 
 function ResetTeamsList()
