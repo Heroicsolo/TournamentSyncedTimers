@@ -79,6 +79,7 @@ local function has_value(tab, val)
 end
 
 local function Print(text, ...)
+	text = tostring(text)
 	if text then
 		if text:match("%%[dfqs%d%.]") then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00".. addonName ..":|r " .. format(text, ...))
@@ -250,9 +251,9 @@ function f:CHAT_MSG_ADDON(prefix, msg, channel, sender)
 	if prefix == addonPrefix then
 		if msg == "rc" then
 			spectator = sender
-			DoReadyCheck()
 			readyMembersCount = 0
 			teamMembersCount = GetNumGroupMembers()
+			DoReadyCheck()
 		elseif msg == "start" then
 			spectator = sender
 			TST:BeginCountdown()
@@ -289,9 +290,9 @@ function f:CHAT_MSG_WHISPER(_, msg, user)
 		DoDBMPull()
 	elseif msg == "tst123 rc" then
 		spectator = user
-		DoReadyCheck()
 		readyMembersCount = 0
 		teamMembersCount = GetNumGroupMembers()
+		DoReadyCheck()
 	elseif msg == "tst123 ready" then
 		Print(user.."'s team READY!")
 		local idx = indexOf(captains, user)
@@ -302,14 +303,14 @@ function f:CHAT_MSG_WHISPER(_, msg, user)
 		local idx = indexOf(captains, user)
 		teamsReadiness[idx] = false
 		RefreshCaptainsListLabel()
-	elseif msg == "complete" then
+	elseif msg == "tst123 complete" then
 		if winner == nil then
 			winner = user
 		end
 		local idx = indexOf(captains, user)
 		completedTeams[idx] = true
 		RefreshCaptainsListLabel()
-	elseif msg == "key_activated" then
+	elseif msg == "tst123 key_activated" then
 		local idx = indexOf(captains, user)
 		startedTeams[idx] = true
 		RefreshCaptainsListLabel()
@@ -326,9 +327,9 @@ function f:READY_CHECK_FINISHED()
 	end
 end
 
-function f:READY_CHECK_CONFIRM(unit,response,isTest)
+function f:READY_CHECK_CONFIRM(event,unit,status)
 	if unit then
-		if response == true then
+		if status == true then
 			readyMembersCount = readyMembersCount + 1
 		end
 	end
