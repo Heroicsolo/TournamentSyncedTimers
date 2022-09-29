@@ -11,6 +11,8 @@ local AceTimer = LibStub("AceTimer-3.0")
 local captainsList = {}
 local completedTeams = {}
 local startedTeams = {}
+local killedBosses = {}
+local totalBosses = {}
 local winner = nil
 local gameStarted = false
 local teamsReadiness = {}
@@ -31,6 +33,7 @@ f:RegisterEvent("READY_CHECK_CONFIRM")
 f:RegisterEvent("CHAT_MSG_WHISPER")
 f:RegisterEvent("CHALLENGE_MODE_COMPLETED")
 f:RegisterEvent("CHALLENGE_MODE_START")
+f:RegisterEvent("BOSS_KILL")
 
 local function myChatFilter(self, event, msg, author, ...)
   if msg:find(addonPrefix) then
@@ -189,6 +192,8 @@ local function OpenPanel()
 			teamsReadiness[#teamsReadiness + 1] = false
 			completedTeams[#completedTeams + 1] = false
 			startedTeams[#startedTeams + 1] = false
+			killedBosses[#killedBosses + 1] = 0
+			totalBosses[#totalBosses + 1] = 0
 		end
 	end
 	
@@ -215,7 +220,7 @@ function SetCaptainLabels()
 				if winner == captains[i] then
 					captainsList[i]:SetText(captains[i].."\124cff00FF00 WINNER\124r")
 				elseif completedTeams[i] == false and startedTeams[i] == true then
-					captainsList[i]:SetText(captains[i].."\124cffFFFF00 RUNNING...\124r")
+					captainsList[i]:SetText(captains[i].."\124cffFFFF00 RUNNING ["..killedBosses[i].."/"..totalBosses[i].."]\124r")
 				elseif completedTeams[i] == true and startedTeams[i] == true then
 					captainsList[i]:SetText(captains[i].."\124cff00FF00 FINISHED\124r")
 				else
@@ -238,13 +243,25 @@ end
 function f:CHALLENGE_MODE_COMPLETED()
 	local mapID, level, time, onTime, keystoneUpgradeLevels = C_ChallengeMode.GetCompletionInfo()
 	local name, _, timeLimit = C_ChallengeMode.GetMapUIInfo(mapID)
-	SendAddonEvent(spectator, "We've completed "..name.."+"..level.." in "..timeFormatMS(time))
-	SendAddonEvent(spectator, "complete")
+	SendAddonEvent(spectator, "We've completed "..name.."+"..level.." in "..timeFormatMS(time), false)
+	SendAddonEvent(spectator, "complete", true)
 	spectator = nil
 end
 
 function f:CHALLENGE_MODE_START(mapID)
-	SendAddonEvent(spectator, "key_activated")
+	local bossesCount = 0
+	local numCriteria = select(3, C_Scenario.GetStepInfo())
+	for criteriaIndex = 1, numCriteria do
+		local isWeightedProgress = select(13, C_Scenario.GetCriteriaInfo(criteriaIndex))
+		if not isWeightedProgress then
+			bossesCount = bossesCount + 1
+		end
+	end
+	SendAddonEvent(spectator, "key_activated"..bossesCount, true)
+end
+
+function f:BOSS_KILL(encounterID)
+	SendAddonEvent(spectator, "boss_killed", true)
 end
 
 function f:CHAT_MSG_ADDON(prefix, msg, channel, sender)
@@ -275,9 +292,15 @@ function f:CHAT_MSG_ADDON(prefix, msg, channel, sender)
 			local idx = indexOf(captains, sender)
 			completedTeams[idx] = true
 			RefreshCaptainsListLabel()
-		elseif msg == "key_activated" then
+		elseif string.find(msg, "key_activated") then
 			local idx = indexOf(captains, sender)
 			startedTeams[idx] = true
+			totalBosses[idx] = string.match(msg, "%d")
+			killedBosses[idx] = 0
+			RefreshCaptainsListLabel()
+		elseif msg == "boss_killed" then
+			local idx = indexOf(captains, sender)
+			killedBosses[idx] = killedBosses[idx] + 1
 			RefreshCaptainsListLabel()
 		end
 	end
@@ -310,9 +333,15 @@ function f:CHAT_MSG_WHISPER(_, msg, user)
 		local idx = indexOf(captains, user)
 		completedTeams[idx] = true
 		RefreshCaptainsListLabel()
-	elseif msg == "tst123 key_activated" then
+	elseif string.find(msg, "tst123 key_activated") then
 		local idx = indexOf(captains, user)
 		startedTeams[idx] = true
+		totalBosses[idx] = string.match(msg, "[tst123 key_activated]%d")
+		killedBosses[idx] = 0
+		RefreshCaptainsListLabel()
+	elseif msg == "tst123 boss_killed" then
+		local idx = indexOf(captains, user)
+		killedBosses[idx] = killedBosses[idx] + 1
 		RefreshCaptainsListLabel()
 	elseif msg == "tst123" then
 		RegisterCaptain(user, true)
@@ -321,9 +350,9 @@ end
 
 function f:READY_CHECK_FINISHED()
 	if readyMembersCount >= teamMembersCount and spectator ~= nil then
-		SendAddonEvent(spectator, "ready")
+		SendAddonEvent(spectator, "ready", true)
 	elseif readyMembersCount < teamMembersCount and spectator ~= nil then
-		SendAddonEvent(spectator, "notready")
+		SendAddonEvent(spectator, "notready", true)
 	end
 end
 
@@ -385,7 +414,7 @@ end
 
 function BeginReadyCheck()
 	for i=1,#captains do
-		SendAddonEvent(captains[i], "rc")
+		SendAddonEvent(captains[i], "rc", true)
 	end
 end
 
@@ -394,7 +423,7 @@ function DoDBMPull()
 	C_ChatInfo.SendAddonMessage("BigWigs", "P^Pull^10", IsInGroup(2) and "INSTANCE_CHAT" or "RAID")
 end
 
-function SendAddonEvent(receiver, msg)
+function SendAddonEvent(receiver, msg, isHidden)
 	if receiver == nil then return end
 
 	if UnitInParty(receiver) then
@@ -405,7 +434,11 @@ function SendAddonEvent(receiver, msg)
 			C_ChatInfo.SendAddonMessage("BigWigs", "P^Pull^10", "WHISPER", receiver)
 		end
 	else
-		SendChatMessage(addonPrefix.." "..msg, "WHISPER", nil, receiver)
+		if isHidden then
+			SendChatMessage(addonPrefix.." "..msg, "WHISPER", nil, receiver)
+		else
+			SendChatMessage(msg, "WHISPER", nil, receiver)
+		end
 	end
 end
 
@@ -416,7 +449,7 @@ function StartGame()
 	DoDBMPull()
 	for i=1,#captains do
 		startedTeams[i] = false
-		SendAddonEvent(captains[i], "start")
+		SendAddonEvent(captains[i], "start", true)
 	end
 end
 
