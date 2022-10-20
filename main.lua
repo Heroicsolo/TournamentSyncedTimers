@@ -250,9 +250,9 @@ end
 
 function f:CHALLENGE_MODE_START(mapID)
 	local bossesCount = 0
-	local numCriteria = select(3, C_Scenario.GetStepInfo())
+	local stageName, stageDescription, numCriteria, _, _, _, _, numSpells, spellInfo, weightedProgress, _, widgetSetID = C_Scenario.GetStepInfo();
 	for criteriaIndex = 1, numCriteria do
-		local isWeightedProgress = select(13, C_Scenario.GetCriteriaInfo(criteriaIndex))
+		local criteriaString, _, _, quantity, totalQuantity, _, _, quantityString, _, _, _, _, isWeightedProgress = C_Scenario.GetCriteriaInfo(criteriaIndex)
 		if not isWeightedProgress then
 			bossesCount = bossesCount + 1
 		end
@@ -336,7 +336,7 @@ function f:CHAT_MSG_WHISPER(_, msg, user)
 	elseif string.find(msg, "tst123 key_activated") then
 		local idx = indexOf(captains, user)
 		startedTeams[idx] = true
-		totalBosses[idx] = string.match(msg, "[tst123 key_activated]%d")
+		totalBosses[idx] = string.match(string.match(msg, "[tst123 key_activated]%d"), "%d")
 		killedBosses[idx] = 0
 		RefreshCaptainsListLabel()
 	elseif msg == "tst123 boss_killed" then
